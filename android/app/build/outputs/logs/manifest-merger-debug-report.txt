@@ -6,6 +6,7 @@ INJECTED from C:\Users\walte\mt\android\app\src\main\AndroidManifest.xml:1:1-50:
 INJECTED from C:\Users\walte\mt\android\app\src\main\AndroidManifest.xml:1:1-50:12
 MERGED from C:\Users\walte\mt\android\app\src\main\AndroidManifest.xml:1:1-50:12
 MERGED from [:activity_recognition_flutter] C:\Users\walte\mt\build\activity_recognition_flutter\intermediates\library_manifest\debug\AndroidManifest.xml:2:1-9:12
+MERGED from [:fluttertoast] C:\Users\walte\mt\build\fluttertoast\intermediates\library_manifest\debug\AndroidManifest.xml:2:1-7:12
 MERGED from [:permission_handler] C:\Users\walte\mt\build\permission_handler\intermediates\library_manifest\debug\AndroidManifest.xml:2:1-7:12
 MERGED from [com.google.android.gms:play-services-location:16.0.0] C:\Users\walte\.gradle\caches\transforms-2\files-2.1\305ad16284b5ff810698a43cec8800e9\jetified-play-services-location-16.0.0\AndroidManifest.xml:2:1-9:12
 MERGED from [com.google.android.gms:play-services-base:16.0.1] C:\Users\walte\.gradle\caches\transforms-2\files-2.1\acbd7e80422a2d1b1fe5df008bc8112e\jetified-play-services-base-16.0.1\AndroidManifest.xml:17:1-29:12
@@ -156,6 +157,8 @@ INJECTED from C:\Users\walte\mt\android\app\src\main\AndroidManifest.xml
 INJECTED from C:\Users\walte\mt\android\app\src\main\AndroidManifest.xml
 MERGED from [:activity_recognition_flutter] C:\Users\walte\mt\build\activity_recognition_flutter\intermediates\library_manifest\debug\AndroidManifest.xml:5:5-44
 MERGED from [:activity_recognition_flutter] C:\Users\walte\mt\build\activity_recognition_flutter\intermediates\library_manifest\debug\AndroidManifest.xml:5:5-44
+MERGED from [:fluttertoast] C:\Users\walte\mt\build\fluttertoast\intermediates\library_manifest\debug\AndroidManifest.xml:5:5-44
+MERGED from [:fluttertoast] C:\Users\walte\mt\build\fluttertoast\intermediates\library_manifest\debug\AndroidManifest.xml:5:5-44
 MERGED from [:permission_handler] C:\Users\walte\mt\build\permission_handler\intermediates\library_manifest\debug\AndroidManifest.xml:5:5-44
 MERGED from [:permission_handler] C:\Users\walte\mt\build\permission_handler\intermediates\library_manifest\debug\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.gms:play-services-location:16.0.0] C:\Users\walte\.gradle\caches\transforms-2\files-2.1\305ad16284b5ff810698a43cec8800e9\jetified-play-services-location-16.0.0\AndroidManifest.xml:5:5-44
