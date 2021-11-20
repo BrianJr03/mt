@@ -60,8 +60,8 @@ class _MyAppState extends State<MyApp> {
 
   bool rideEnded(ActivityEvent currentActivity) {
     // * Detects the end of a ride by determining
-    // * if the user is on foot
-    return onFoot(currentActivity);
+    // * when the user is off bicycle and on foot
+    return onFoot(currentActivity) && onBicycle(previousActivity);
   }
 
   bool bicycleStarted(ActivityEvent currentActivity) {
