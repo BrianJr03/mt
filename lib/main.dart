@@ -22,6 +22,8 @@ class _MyAppState extends State<MyApp> {
   String _timeStampStart = '';
   String _timeStampEnd = '';
 
+  String _rideStatus = 'Detecting Activity...';
+
   @override
   void initState() {
     super.initState();
@@ -50,24 +52,24 @@ class _MyAppState extends State<MyApp> {
     return ac.type == ActivityType.ON_BICYCLE;
   }
 
-  bool isStill(ActivityEvent ac) {
-    return ac.type == ActivityType.STILL;
+  bool isStarted(ActivityEvent currentActivity, Function(ActivityEvent) f) {
+    // * Detects only the first event of its type in _events
+    // * as there can be consecutive events of the same type
+    return f(currentActivity) && !f(previousActivity);
+  }
+
+  bool rideEnded(ActivityEvent currentActivity) {
+    // * Detects the end of a ride by determining
+    // * if the user is on foot
+    return onFoot(currentActivity);
   }
 
   bool bicycleStarted(ActivityEvent currentActivity) {
-    return onBicycle(currentActivity) && !onBicycle(previousActivity);
-  }
-
-  bool bicycleEnded(ActivityEvent currentActivity) {
-    return !bicycleStarted(currentActivity);
+    return isStarted(currentActivity, onBicycle);
   }
 
   bool vehicleStarted(ActivityEvent currentActivity) {
-    return inVehicle(currentActivity) && !inVehicle(previousActivity);
-  }
-
-  bool vehicleEnded(ActivityEvent currentActivity) {
-    return !vehicleStarted(currentActivity);
+    return isStarted(currentActivity, inVehicle);
   }
 
   void _startTracking() {
@@ -82,18 +84,19 @@ class _MyAppState extends State<MyApp> {
   }
 
   void onData(ActivityEvent currentActivity) {
-    if (vehicleStarted(currentActivity) || bicycleStarted(currentActivity)) {
+    if (bicycleStarted(currentActivity)) {
       setState(() {
         recordActivity(currentActivity);
         _timeStampStart = currentActivity.timeStamp.toString();
         showToast("Start: $_timeStampStart");
+        _rideStatus = 'Riding...';
       });
-    } else if (vehicleEnded(currentActivity) || bicycleEnded(currentActivity) &&
-        (isStill(currentActivity) || onFoot(currentActivity))) {
+    } else if (rideEnded(currentActivity)) {
       setState(() {
         recordActivity(currentActivity);
         _timeStampEnd = currentActivity.timeStamp.toString();
         showToast("End: $_timeStampEnd");
+        _rideStatus = 'Ride ended.';
       });
     }
   }
@@ -110,7 +113,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Activity Recognition Demo'),
+          title: Text(_rideStatus),
         ),
         body: Center(
             child: ListView.builder(
