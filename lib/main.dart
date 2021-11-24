@@ -53,10 +53,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   static Position _initPos() {
-    return Position(
+    return const Position(
         longitude: 0,
         latitude: 0,
-        timestamp: DateTime.now(),
+        timestamp: null,
         accuracy: 0,
         altitude: 0,
         heading: 0,
