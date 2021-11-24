@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:mt/toasted.dart';
+import 'package:mt/phone_activity.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -15,15 +17,18 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final List<ActivityEvent> _events = [];
-  late Stream<ActivityEvent> activityStream;
-  ActivityEvent previousActivity = ActivityEvent.empty();
-  ActivityRecognition activityRecognition = ActivityRecognition.instance;
+  final toasted = Toasted();
 
-  Toasted toasted = Toasted();
+  final pA = PhoneActivity(
+      events: List.empty(),
+      activityStream: const Stream.empty(),
+      previousActivity: ActivityEvent.empty(),
+      activityRecognition: ActivityRecognition.instance);
 
   late String _timeStampStart;
   late String _timeStampEnd;
+
+  Duration _timeTraveled = Duration.zero;
 
   Position _startLocation = _initPos();
   Position _endLocation = _initPos();
@@ -33,7 +38,6 @@ class _MyAppState extends State<MyApp> {
   late Position currentPosition = _initPos();
 
   double _mileage = 0.0;
-  final List<double> _mileageList = [];
 
   @override
   void initState() {
@@ -45,10 +49,10 @@ class _MyAppState extends State<MyApp> {
     await _getCurrentLocation();
     if (Platform.isAndroid) {
       if (await Permission.activityRecognition.request().isGranted) {
-        _startTracking();
+        pA.startTracking(onData);
       }
     } else {
-      _startTracking();
+      pA.startTracking(onData);
     }
   }
 
@@ -75,92 +79,24 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  bool inVehicle(ActivityEvent ac) {
-    return ac.type == ActivityType.IN_VEHICLE;
-  }
-
-  bool onFoot(ActivityEvent ac) {
-    return ac.type == ActivityType.ON_FOOT;
-  }
-
-  bool onBicycle(ActivityEvent ac) {
-    return ac.type == ActivityType.ON_BICYCLE;
-  }
-
-  bool isStill(ActivityEvent ac) {
-    return ac.type == ActivityType.STILL;
-  }
-
-  bool isStarted(ActivityEvent currentActivity, Function(ActivityEvent) f) {
-    // * Detects only the first event of its type
-    // * as there can be consecutive events of the same type
-    return f(currentActivity) && !f(previousActivity);
-  }
-
-  bool rideEnded(ActivityEvent currentActivity,
-      {required Function(ActivityEvent) previous}) {
-    // * Detects the end of a ride by determining
-    // * when the user is on foot and the previous
-    // * activity matches what is specfied
-    return onFoot(currentActivity) && previous(previousActivity);
-  }
-
-  bool onFootStarted(ActivityEvent currentActivity) {
-    return isStarted(currentActivity, onFoot);
-  }
-
-  bool onFootEnded(ActivityEvent currentActivity,
-      {required Function(ActivityEvent) previous}) {
-    return isStill(currentActivity) && previous(previousActivity);
-  }
-
-  bool bicycleStarted(ActivityEvent currentActivity) {
-    return isStarted(currentActivity, onBicycle);
-  }
-
-  bool bicycleEnded(ActivityEvent currentActivity) {
-    return rideEnded(currentActivity, previous: onBicycle);
-  }
-
-  bool vehicleStarted(ActivityEvent currentActivity) {
-    return isStarted(currentActivity, inVehicle);
-  }
-
-  bool vehicleEnded(ActivityEvent currentActivity) {
-    return rideEnded(currentActivity, previous: inVehicle);
-  }
-
-  void _startTracking() {
-    activityStream =
-        activityRecognition.startStream(runForegroundService: true);
-    activityStream.listen(onData);
-  }
-
-  void recordActivity(ActivityEvent currentActivity) {
-    _events.add(currentActivity);
-    previousActivity = currentActivity;
-  }
-
   void onData(ActivityEvent currentActivity) async {
-    if (vehicleStarted(currentActivity)) {
-      setState(() async {
-        recordActivity(currentActivity);
-        _timeStampStart = currentActivity.timeStamp.toString();
-        toasted.showToast("Start: $_timeStampStart");
-        _rideStatus = 'Riding...';
-        await _getCurrentLocation();
-        _startLocation = currentPosition;
-      });
-    } else if (vehicleEnded(currentActivity)) {
-      setState(() async {
-        recordActivity(currentActivity);
-        _timeStampEnd = currentActivity.timeStamp.toString();
-        toasted.showToast("End: $_timeStampEnd");
-        _rideStatus = 'Ride ended.';
-        await _getCurrentLocation();
-        _endLocation = currentPosition;
-        updateMileage(_startLocation, _endLocation);
-      });
+    if (pA.vehicleStarted(currentActivity)) {
+    await _getCurrentLocation();
+    setState(() {
+      pA.recordActivity(currentActivity);
+      _timeStampStart = currentActivity.timeStamp.toString();
+      _rideStatus = 'Riding...';
+      _startLocation = currentPosition;
+    });
+    } else if (pA.vehicleEnded(currentActivity)) {
+    await _getCurrentLocation();
+    setState(() {
+      pA.recordActivity(currentActivity);
+      _timeStampEnd = currentActivity.timeStamp.toString();
+      _rideStatus = 'Ride ended.';
+      _endLocation = currentPosition;
+      updateMileage(_startLocation, _endLocation);
+    });
     }
   }
 
@@ -168,8 +104,18 @@ class _MyAppState extends State<MyApp> {
     double meters = Geolocator.distanceBetween(
         start.latitude, start.longitude, end.latitude, end.longitude);
     _mileage = double.parse((meters * 0.000621371192).toStringAsFixed(2));
-    _mileageList.add(_mileage);
-    _mileage = 0.0;
+  }
+
+  void updateTravelTime() {
+    var format = DateFormat("HH:mm:ss");
+    var startTime = format.parse(_timeStampStart.substring(11, 19));
+    var endTime = format.parse(_timeStampEnd.substring(11, 19));
+    _timeTraveled = endTime.difference(startTime);
+  }
+
+  String formatTimeStamp(String timeStamp) {
+    var format = DateFormat.yMd().add_jm();
+    return format.parse(timeStamp).toString();
   }
 
   @override
@@ -179,16 +125,27 @@ class _MyAppState extends State<MyApp> {
       appBar: AppBar(title: Text(_rideStatus)),
       body: Center(
         child: ListView.builder(
-            itemCount: _events.length,
-            reverse: true,
+            itemCount: pA.events.length,
+            reverse: false,
             itemBuilder: (BuildContext context, int idx) {
-              final entry = _events[idx];
-              final mileage = _mileageList[idx];
-              return ListTile(
-                  leading: Text("${idx + 1}: " +
-                      entry.timeStamp.toString().substring(0, 19)),
-                  trailing:
-                      Text("\nMileage \n$mileage mi"));
+              final entry = pA.events[idx];
+              return Card(
+                  child: InkWell(
+                splashColor: Colors.blue.withAlpha(30),
+                onLongPress: () {},
+                child: Column(
+                  children: [
+                    ListTile(
+                        leading: Text("${idx + 1}"),
+                        title: Text(entry.timeStamp
+                                .toString()
+                                .substring(0, 10) +
+                            " @ ${entry.timeStamp.toString().substring(11, 16)}"),
+                        subtitle: Text(entry.type.toString().substring(13)),
+                        trailing: Text("Mileage $_mileage mi"))
+                  ],
+                ),
+              ));
             }),
       ),
     ));
