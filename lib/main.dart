@@ -1,10 +1,9 @@
 import 'dart:io';
-import 'package:mt/Toast.dart';
-import 'package:activity_recognition_flutter/activity_recognition_flutter.dart';
+import 'package:mt/toasted.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'location.dart';
+import 'package:activity_recognition_flutter/activity_recognition_flutter.dart';
 
 void main() => runApp(const MyApp());
 
@@ -22,7 +21,6 @@ class _MyAppState extends State<MyApp> {
   ActivityRecognition activityRecognition = ActivityRecognition.instance;
 
   Toasted toasted = Toasted();
-  Location location = Location();
 
   late String _timeStampStart;
   late String _timeStampEnd;
@@ -32,6 +30,11 @@ class _MyAppState extends State<MyApp> {
 
   String _rideStatus = 'Detecting Activity...';
 
+  late Position currentPosition = _initPos();
+
+  double _mileage = 0.0;
+  final List<double> _mileageList = [];
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +42,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _init() async {
+    await _getCurrentLocation();
     if (Platform.isAndroid) {
       if (await Permission.activityRecognition.request().isGranted) {
         _startTracking();
@@ -58,6 +62,17 @@ class _MyAppState extends State<MyApp> {
         heading: 0,
         speed: 0,
         speedAccuracy: 0);
+  }
+
+  _getCurrentLocation() {
+    Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.best,
+            forceAndroidLocationManager: true)
+        .then((Position position) {
+      setState(() {
+        currentPosition = position;
+      });
+    });
   }
 
   bool inVehicle(ActivityEvent ac) {
@@ -133,7 +148,8 @@ class _MyAppState extends State<MyApp> {
         _timeStampStart = currentActivity.timeStamp.toString();
         toasted.showToast("Start: $_timeStampStart");
         _rideStatus = 'Riding...';
-        _startLocation = await location.determineCurrentPosition();
+        await _getCurrentLocation();
+        _startLocation = currentPosition;
       });
     } else if (vehicleEnded(currentActivity)) {
       setState(() async {
@@ -141,42 +157,40 @@ class _MyAppState extends State<MyApp> {
         _timeStampEnd = currentActivity.timeStamp.toString();
         toasted.showToast("End: $_timeStampEnd");
         _rideStatus = 'Ride ended.';
-        _endLocation = await location.determineCurrentPosition();
+        await _getCurrentLocation();
+        _endLocation = currentPosition;
+        updateMileage(_startLocation, _endLocation);
       });
     }
+  }
+
+  void updateMileage(Position start, Position end) {
+    double meters = Geolocator.distanceBetween(
+        start.latitude, start.longitude, end.latitude, end.longitude);
+    _mileage = double.parse((meters * 0.000621371192).toStringAsFixed(2));
+    _mileageList.add(_mileage);
+    _mileage = 0.0;
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text(_rideStatus),
-        ),
-        body: Center(
-            child: Column(
-          children: [
-            Row(children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                    "Distanced Traveled: ${location.getMileageBetween(_startLocation, _endLocation)}",
-                    style: const TextStyle(fontSize: 25)),
-              )
-            ]),
-            ListView.builder(
-                itemCount: _events.length,
-                reverse: true,
-                itemBuilder: (BuildContext context, int idx) {
-                  final entry = _events[idx];
-                  return ListTile(
-                      leading: Text("${idx + 1}: " +
-                          entry.timeStamp.toString().substring(0, 19)),
-                      trailing: Text(entry.type.toString().split('.').last));
-                }),
-          ],
-        )),
+        home: Scaffold(
+      appBar: AppBar(title: Text(_rideStatus)),
+      body: Center(
+        child: ListView.builder(
+            itemCount: _events.length,
+            reverse: true,
+            itemBuilder: (BuildContext context, int idx) {
+              final entry = _events[idx];
+              final mileage = _mileageList[idx];
+              return ListTile(
+                  leading: Text("${idx + 1}: " +
+                      entry.timeStamp.toString().substring(0, 19)),
+                  trailing:
+                      Text("\nMileage \n$mileage mi"));
+            }),
       ),
-    );
+    ));
   }
 }
