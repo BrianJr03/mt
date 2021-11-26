@@ -33,6 +33,10 @@ class PhoneActivity {
     return ac.type == ActivityType.IN_VEHICLE;
   }
 
+  bool isEmpty(ActivityEvent ac) {
+    return ac == ActivityEvent.empty();
+  }
+
   void startTracking(Function(ActivityEvent)? onData) {
     activityStream =
         activityRecognition.startStream(runForegroundService: true);
@@ -44,13 +48,14 @@ class PhoneActivity {
     previousActivity = currentActivity;
   }
 
-  bool isStarted(ActivityEvent currentActivity, Function(ActivityEvent) f) {
+  bool isStartDetected(
+      ActivityEvent currentActivity, Function(ActivityEvent) f) {
     // * Detects only the first event of its type
     // * as there can be consecutive events of the same type
     return f(currentActivity) && !f(previousActivity);
   }
 
-  bool rideEnded(ActivityEvent currentActivity,
+  bool rideEndDetected(ActivityEvent currentActivity,
       {required Function(ActivityEvent) previous}) {
     // * Detects the end of a ride by determining
     // * when the user is on foot and the previous
@@ -58,19 +63,27 @@ class PhoneActivity {
     return onFoot(currentActivity) && previous(previousActivity);
   }
 
-  bool bicycleStarted(ActivityEvent currentActivity) {
-    return isStarted(currentActivity, onBicycle);
+  bool bicycleStartDetected(ActivityEvent currentActivity) {
+    return isStartDetected(currentActivity, onBicycle);
   }
 
-  bool bicycleEnded(ActivityEvent currentActivity) {
-    return rideEnded(currentActivity, previous: onBicycle);
+  bool bicycleEndDetected(ActivityEvent currentActivity) {
+    return rideEndDetected(currentActivity, previous: onBicycle);
   }
 
-  bool vehicleStarted(ActivityEvent currentActivity) {
-    return isStarted(currentActivity, inVehicle);
+  bool onFootStartDetected(ActivityEvent currentActivity) {
+    return isStartDetected(currentActivity, onFoot);
   }
 
-  bool vehicleEnded(ActivityEvent currentActivity) {
-    return rideEnded(currentActivity, previous: inVehicle);
+  bool onFootEndDetected(ActivityEvent currentActivity) {
+    return isStill(currentActivity) && onFoot(previousActivity);
+  }
+
+  bool vehicleStartDetected(ActivityEvent currentActivity) {
+    return isStartDetected(currentActivity, inVehicle);
+  }
+
+  bool vehicleEndDetected(ActivityEvent currentActivity) {
+    return rideEndDetected(currentActivity, previous: inVehicle);
   }
 }

@@ -1,9 +1,8 @@
 import 'dart:io';
-import 'package:intl/intl.dart';
+import 'package:mt/location.dart';
 import 'package:mt/toasted.dart';
 import 'package:mt/phone_activity.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:activity_recognition_flutter/activity_recognition_flutter.dart';
 
@@ -19,25 +18,20 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final toasted = Toasted();
 
+  final location = Location(
+      timeStampStart: "",
+      timeStampEnd: "",
+      timeTraveled: Duration.zero,
+      startPosition: Location.initPos(),
+      endPosition: Location.initPos());
+
   final pA = PhoneActivity(
-      events: List.empty(),
+      events: [],
       activityStream: const Stream.empty(),
       previousActivity: ActivityEvent.empty(),
       activityRecognition: ActivityRecognition.instance);
 
-  late String _timeStampStart;
-  late String _timeStampEnd;
-
-  Duration _timeTraveled = Duration.zero;
-
-  Position _startLocation = _initPos();
-  Position _endLocation = _initPos();
-
-  String _rideStatus = 'Detecting Activity...';
-
-  late Position currentPosition = _initPos();
-
-  double _mileage = 0.0;
+  String _rideStatus = 'Waiting for Ride to Start...';
 
   @override
   void initState() {
@@ -46,7 +40,6 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _init() async {
-    await _getCurrentLocation();
     if (Platform.isAndroid) {
       if (await Permission.activityRecognition.request().isGranted) {
         pA.startTracking(onData);
@@ -56,66 +49,33 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  static Position _initPos() {
-    return const Position(
-        longitude: 0,
-        latitude: 0,
-        timestamp: null,
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0);
+  void startRide(ActivityEvent currentActivity) async {
+    await location.getCurrentPositon();
+    setState(() {
+      pA.recordActivity(currentActivity);
+      location.timeStampStart = currentActivity.timeStamp.toString();
+      _rideStatus = 'Riding...';
+      location.startPosition = location.currentPosition;
+    });
   }
 
-  _getCurrentLocation() {
-    Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.best,
-            forceAndroidLocationManager: true)
-        .then((Position position) {
-      setState(() {
-        currentPosition = position;
-      });
+  void endRide(ActivityEvent currentActivity) async {
+    await location.getCurrentPositon();
+    setState(() {
+      pA.recordActivity(currentActivity);
+      location.timeStampEnd = currentActivity.timeStamp.toString();
+      _rideStatus = 'Ride ended.';
+      location.endPosition = location.currentPosition;
+      location.setMileage(location.startPosition, location.endPosition);
     });
   }
 
   void onData(ActivityEvent currentActivity) async {
-    if (pA.vehicleStarted(currentActivity)) {
-    await _getCurrentLocation();
-    setState(() {
-      pA.recordActivity(currentActivity);
-      _timeStampStart = currentActivity.timeStamp.toString();
-      _rideStatus = 'Riding...';
-      _startLocation = currentPosition;
-    });
-    } else if (pA.vehicleEnded(currentActivity)) {
-    await _getCurrentLocation();
-    setState(() {
-      pA.recordActivity(currentActivity);
-      _timeStampEnd = currentActivity.timeStamp.toString();
-      _rideStatus = 'Ride ended.';
-      _endLocation = currentPosition;
-      updateMileage(_startLocation, _endLocation);
-    });
+    if (pA.vehicleStartDetected(currentActivity)) {
+      startRide(currentActivity);
+    } else if (pA.vehicleEndDetected(currentActivity)) {
+      endRide(currentActivity);
     }
-  }
-
-  void updateMileage(Position start, Position end) {
-    double meters = Geolocator.distanceBetween(
-        start.latitude, start.longitude, end.latitude, end.longitude);
-    _mileage = double.parse((meters * 0.000621371192).toStringAsFixed(2));
-  }
-
-  void updateTravelTime() {
-    var format = DateFormat("HH:mm:ss");
-    var startTime = format.parse(_timeStampStart.substring(11, 19));
-    var endTime = format.parse(_timeStampEnd.substring(11, 19));
-    _timeTraveled = endTime.difference(startTime);
-  }
-
-  String formatTimeStamp(String timeStamp) {
-    var format = DateFormat.yMd().add_jm();
-    return format.parse(timeStamp).toString();
   }
 
   @override
@@ -140,9 +100,9 @@ class _MyAppState extends State<MyApp> {
                         title: Text(entry.timeStamp
                                 .toString()
                                 .substring(0, 10) +
-                            " @ ${entry.timeStamp.toString().substring(11, 16)}"),
+                            " @ ${entry.timeStamp.toLocal().toString().substring(11, 16)}"),
                         subtitle: Text(entry.type.toString().substring(13)),
-                        trailing: Text("Mileage $_mileage mi"))
+                        trailing: Text("Mileage ${location.metersToMiles(location.mileage)} mi"))
                   ],
                 ),
               ));
